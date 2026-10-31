@@ -2,49 +2,47 @@ const int PIN_NTC = A0;
 const int PIN_TEMP_OUT = 3;
 const int PIN_OR_OUT = 4;
 
-const int redPin = 5;
-const int greenPin = 6;
-const int bluePin = 9;
+const int RED_PIN = 5;
+const int GREEN_PIN = 6;
+const int BLUE_PIN = 9;
 
-bool isDanger = false;
-bool isWarning = false;
-bool isSafe = false;
+const int SERIAL_RATE = 9600;
+
+const int SENSOR_READ_DELAY = 50;
+const int DANGER_WARNING_DELAY = 500;
+const int SAFE_DELAY = 1000;
+
+const float WARNING_TEMP = 30.0;
+const float DANGER_TEMP = 35.0;
 
 void setColor(int redValue, int greenValue, int blueValue)
 {
-  analogWrite(redPin, redValue);
-  analogWrite(greenPin, greenValue);
-  analogWrite(bluePin, blueValue);
+  analogWrite(RED_PIN, redValue);
+  analogWrite(GREEN_PIN, greenValue);
+  analogWrite(BLUE_PIN, blueValue);
 }
 
-void LED(bool danger, bool warning, bool safe)
+void blinkColor(int redValue, int greenValue, int blueValue, int delayMs)
 {
-  if (danger) {
-    setColor(255, 0, 0);
-    delay(500);
-    setColor(0, 0, 0);
-    delay(500);
-  }
-  else if (warning) {
-    setColor(255, 165, 0);
-    delay(500);
-    setColor(0, 0, 0);
-    delay(500);
-  }
-  else if (safe) {
-    setColor(255, 255, 255);
-    delay(1000);
-    setColor(0, 0, 0);
-    delay(1000);
-  }
+  setColor(redValue, greenValue, blueValue);
+  delay(delayMs);
+  setColor(0, 0, 0);
+  delay(delayMs);
+}
+
+void DoBlink(float tempC, bool flameDetected)
+{
+  if (flameDetected || tempC >= DANGER_TEMP) return blinkColor(255, 0, 0, DANGER_WARNING_DELAY);
+  if (tempC >= WARNING_TEMP) return blinkColor(255, 165, 0, DANGER_WARNING_DELAY);
+  blinkColor(255, 255, 255, SAFE_DELAY);
 }
 
 void setup()
 {
-  Serial.begin(9600);
-  pinMode(redPin, OUTPUT);
-  pinMode(greenPin, OUTPUT);
-  pinMode(bluePin, OUTPUT);
+  Serial.begin(SERIAL_RATE);
+  pinMode(RED_PIN, OUTPUT);
+  pinMode(GREEN_PIN, OUTPUT);
+  pinMode(BLUE_PIN, OUTPUT);
 
   pinMode(PIN_TEMP_OUT, OUTPUT); // GPIO 3 подає сигнал на вхід OR
   pinMode(PIN_OR_OUT, INPUT);    // GPIO 4 читає сигнал з виходу OR
@@ -84,36 +82,30 @@ float ReadNtcTemperature()
   return tempK;
 }
 
+float getTemperatureCelsius()
+{
+  return ReadNtcTemperature() - 273.15;
+}
+
+bool checkFlameDetected()
+{
+  digitalWrite(PIN_TEMP_OUT, LOW);
+  delayMicroseconds(SENSOR_READ_DELAY);
+  return (digitalRead(PIN_OR_OUT) == HIGH);
+}
+
+void updateTempOutSignal(float tempC)
+{
+  digitalWrite(PIN_TEMP_OUT, tempC > WARNING_TEMP ? HIGH : LOW);
+  delayMicroseconds(SENSOR_READ_DELAY);
+}
+
 void loop()
 {
-  isSafe    = false;
-  isWarning = false;
-  isDanger  = false;
+  float temp = getTemperatureCelsius();
+  bool flameDetected = checkFlameDetected();
 
-  float temp = ReadNtcTemperature() - 273.15;
-
-  digitalWrite(PIN_TEMP_OUT, LOW);
-  delayMicroseconds(50);
-  bool flameDetected = (digitalRead(PIN_OR_OUT) == HIGH);
-
-  if (temp > 30.0) {
-    digitalWrite(PIN_TEMP_OUT, HIGH);
-  } else {
-    digitalWrite(PIN_TEMP_OUT, LOW);
-  }
-  delayMicroseconds(50);
-
+  updateTempOutSignal(temp);
   Serial.println(temp);
-
-  if (flameDetected || temp >= 35.0) {
-    isDanger = true;
-  }
-  else if (temp >= 30.0 && temp < 35.0) {
-    isWarning = true;
-  }
-  else {
-    isSafe = true;
-  }
-
-  LED(isDanger, isWarning, isSafe);
+  DoBlink(temp, flameDetected);
 }
