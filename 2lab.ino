@@ -37,16 +37,21 @@ void DoBlink(float tempC, bool flameDetected)
   blinkColor(255, 255, 255, SAFE_DELAY);
 }
 
-void setup()
+void initPins()
 {
-  Serial.begin(SERIAL_RATE);
   pinMode(RED_PIN, OUTPUT);
   pinMode(GREEN_PIN, OUTPUT);
   pinMode(BLUE_PIN, OUTPUT);
 
-  pinMode(PIN_TEMP_OUT, OUTPUT); // GPIO 3 подає сигнал на вхід OR
-  pinMode(PIN_OR_OUT, INPUT);    // GPIO 4 читає сигнал з виходу OR
+  pinMode(PIN_TEMP_OUT, OUTPUT);
+  pinMode(PIN_OR_OUT, INPUT);
   pinMode(PIN_NTC, INPUT);
+}
+
+void setup()
+{
+  Serial.begin(SERIAL_RATE);
+  initPins();
 
   // задаємо опорну напругу Vref = Vcc
   // АЦП вимірює частку від Vcc (Vout / Vcc)
